@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Factyne{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Dashboard</h2>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0;">
+        <div class="result-card">
+            <div style="font-size: 0.85rem; color: #666;">Total Submissions</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #667eea;">{{ total_content }}</div>
+        </div>
+        
+        <div class="result-card">
+            <div style="font-size: 0.85rem; color: #666;">Avg Trust Score</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #667eea;">{{ avg_trust_score|floatformat:2 }}</div>
+        </div>
+        
+        <div class="result-card">
+            <div style="font-size: 0.85rem; color: #666;">Total Claims</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #667eea;">{{ total_claims }}</div>
+        </div>
+        
+        <div class="result-card">
+            <div style="font-size: 0.85rem; color: #666;">Contradictions Found</div>
+            <div style="font-size: 2rem; font-weight: bold; color: #d9534f;">{{ total_contradictions }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Recent Submissions</h3>
+    
+    {% if contents %}
+    <div style="margin-top: 1.5rem;">
+        {% for content in contents %}
+        <div class="result-card" style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <p style="color: #333; line-height: 1.5;">{{ content.raw_text|truncatewords:30 }}</p>
+                    <div style="display: flex; gap: 1.5rem; margin-top: 0.75rem; font-size: 0.85rem; color: #666;">
+                        <span>{{ content.created_at|date:"M d, Y H:i" }}</span>
+                        <span>{{ content.claims.count }} claims</span>
+                        <span>{{ content.contradiction_count }} contradictions</span>
+                    </div>
+                </div>
+                <div style="margin-left: 1rem;">
+                    {% if content.trust_score > 0.7 %}
+                        <span class="score-badge score-high">{{ content.trust_score|floatformat:2 }}</span>
+                    {% elif content.trust_score > 0.4 %}
+                        <span class="score-badge score-medium">{{ content.trust_score|floatformat:2 }}</span>
+                    {% else %}
+                        <span class="score-badge score-low">{{ content.trust_score|floatformat:2 }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No submissions yet. <a href="{% url 'submit_page' %}" style="color: #0c5460; font-weight: bold;">Submit content</a> to get started.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

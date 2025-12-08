@@ -16,9 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from core import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
-    path('', include('main.urls')),
+    path('', views.dashboard, name='dashboard'),          # NEW home page
+    path('submit/', views.submit_page, name='submit_page'),  # NEW submit UI
+    path('api-docs/', views.api_docs, name='api_docs'),      # NEW API docs
 ]
+

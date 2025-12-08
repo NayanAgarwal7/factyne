@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Content - Factyne{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Submit Content for Fact-Checking</h2>
+    <p style="color: #666; margin-top: 0.5rem;">Paste text, a URL, or an article excerpt. We'll extract claims and check for contradictions.</p>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post" style="margin-top: 2rem;">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="url">URL (optional)</label>
+            <input type="url" id="url" name="url" placeholder="https://example.com/article">
+        </div>
+        
+        <div class="form-group">
+            <label for="raw_text">Content *</label>
+            <textarea id="raw_text" name="raw_text" placeholder="Paste the text or article you want to fact-check..." required></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" class="btn btn-primary">Check Content</button>
+            <button type="reset" class="btn btn-secondary">Clear</button>
+        </div>
+    </form>
+</div>
+
+{% if result %}
+<div class="card">
+    <h3>Results</h3>
+    
+    <div style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4>Trust Score</h4>
+            {% if result.trust_score > 0.7 %}
+                <span class="score-badge score-high">{{ result.trust_score|floatformat:2 }}</span>
+            {% elif result.trust_score > 0.4 %}
+                <span class="score-badge score-medium">{{ result.trust_score|floatformat:2 }}</span>
+            {% else %}
+                <span class="score-badge score-low">{{ result.trust_score|floatformat:2 }}</span>
+            {% endif %}
+        </div>
+        
+        <div class="explanation">
+            <strong>Why this score?</strong><br>
+            {{ result.trust_explanation }}
+        </div>
+    </div>
+    
+    {% if result.claims %}
+    <div class="claims-list">
+        <h4>Extracted Claims ({{ result.claims|length }})</h4>
+        
+        {% for claim in result.claims %}
+        <div class="claim-item">
+            <strong>{{ claim.claim_text }}</strong>
+            <div class="claim-confidence">
+                Confidence: {{ claim.confidence|floatformat:0 }}%
+                {% if claim.is_negated %}<span style="margin-left: 1rem; color: #d9534f;">⊘ Negated</span>{% endif %}
+                {% if claim.has_qualifier %}<span style="margin-left: 0.5rem; color: #f0ad4e;">⊙ Qualified</span>{% endif %}
+            </div>
+            {% if claim.evidence_summary %}
+            <div class="claim-confidence" style="margin-top: 0.5rem; color: #0c5460;">
+                Evidence: {{ claim.evidence_summary }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info" style="margin-top: 1.5rem;">
+        No claims could be extracted from this content. Try submitting longer text with more assertions.
+    </div>
+    {% endif %}
+    
+    {% if result.contradiction_count > 0 %}
+    <div class="alert alert-error" style="margin-top: 1.5rem;">
+        ⚠️ <strong>{{ result.contradiction_count }} contradiction(s) detected</strong> with existing content in the database.
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}API Docs - Factyne{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>API Documentation</h2>
+    <p style="color: #666; margin-bottom: 2rem;">Use these endpoints to integrate Factyne into your applications.</p>
+    
+    <h3 style="margin-top: 2rem; color: #333;">POST /api/content/</h3>
+    <p>Submit content for fact-checking.</p>
+    <pre style="background: #f5f5f5; padding: 1rem; border-radius: 6px; overflow-x: auto;"><code>{
+  "raw_text": "COVID-19 vaccines are safe...",
+  "url": "https://example.com/article"  // optional
+}</code></pre>
+    <p><strong>Response (201):</strong></p>
+    <pre style="background: #f5f5f5; padding: 1rem; border-radius: 6px; overflow-x: auto;"><code>{
+  "id": 1,
+  "trust_score": 0.75,
+  "claims_count": 3,
+  "contradiction_count": 0
+}</code></pre>
+    
+    <h3 style="margin-top: 2rem; color: #333;">GET /api/content/list/</h3>
+    <p>Get all submitted content.</p>
+    <p><strong>Query params:</strong> limit=10, offset=0</p>
+    
+    <h3 style="margin-top: 2rem; color: #333;">GET /api/content/{id}/</h3>
+    <p>Get detailed info about a specific content submission.</p>
+    
+    <h3 style="margin-top: 2rem; color: #333;">GET /api/contradictions/</h3>
+    <p>Get all detected contradictions.</p>
+    <p><strong>Query params:</strong> type=direct_negation, limit=20, offset=0</p>
+    
+    <div class="alert alert-info" style="margin-top: 2rem;">
+        For more examples, visit the interactive <a href="/api/" style="color: #0c5460; font-weight: bold;">API browser</a>.
+    </div>
+</div>
+{% endblock %}
