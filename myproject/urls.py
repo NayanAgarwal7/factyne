@@ -18,11 +18,15 @@ from django.contrib import admin
 from django.urls import path, include
 from core import views
 
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
-    path('', views.dashboard, name='dashboard'),          # NEW home page
-    path('submit/', views.submit_page, name='submit_page'),  # NEW submit UI
-    path('api-docs/', views.api_docs, name='api_docs'),      # NEW API docs
+    path('', views.dashboard, name='dashboard'),                    # Home page
+    path('submit/', views.submit_page, name='submit_page'),         # Submit UI
+    path('content/<int:content_id>/', views.content_detail, name='content_detail'),  # NEW: Detail page
+    path('content/<int:content_id>/pdf/', views.content_pdf, name='content_pdf'),
+    path('api-docs/', views.api_docs, name='api_docs'),             # API docs
 ]
+
 

@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Avg
 from django.utils import timezone
@@ -8,9 +8,65 @@ from core.source_credibility import SourceCredibilityEngine
 from core.audit_log import AuditLog
 from api.serializers import ClaimSerializer
 from core.tasks import process_content_async
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from xhtml2pdf import pisa
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def content_detail(request, content_id):
+    """Show detailed analysis of a single content submission."""
+    content = get_object_or_404(Content, id=content_id)
+    claims = Claim.objects.filter(content=content)
+
+    # Use claim_a / claim_b from your model
+    contradictions = Contradiction.objects.filter(
+        claim_a__content=content
+    ) | Contradiction.objects.filter(
+        claim_b__content=content
+    )
+
+    data = {
+        'content': content,
+        'claims': claims,
+        'contradictions': contradictions,
+        'total_claims': claims.count(),
+        'avg_confidence': claims.aggregate(avg=Avg('confidence'))['avg'] or 0,
+    }
+    return render(request, 'content_detail.html', data)
+
+
+def content_pdf(request, content_id):
+    """Export a single content analysis as PDF using xhtml2pdf."""
+    content = get_object_or_404(Content, id=content_id)
+    claims = Claim.objects.filter(content=content)
+
+    contradictions = Contradiction.objects.filter(
+        claim_a__content=content
+    ) | Contradiction.objects.filter(
+        claim_b__content=content
+    )
+
+    context = {
+        'content': content,
+        'claims': claims,
+        'contradictions': contradictions,
+        'total_claims': claims.count(),
+        'avg_confidence': claims.aggregate(avg=Avg('confidence'))['avg'] or 0,
+        'now': timezone.now(),
+    }
+
+    # Render HTML template
+    html_string = render_to_string('content_pdf.html', context)
+
+    # Generate PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="content_{content_id}.pdf"'
+
+    pisa.CreatePDF(html_string, response)
+    return response
 
 
 def submit_page(request):
@@ -38,15 +94,8 @@ def submit_page(request):
                 f'{recent_duplicate.created_at.strftime("%b %d, %Y at %H:%M")}. '
                 f'Reusing previous analysis: Trust Score {recent_duplicate.trust_score:.2f}'
             )
-            result = {
-                'id': recent_duplicate.id,
-                'raw_text': recent_duplicate.raw_text,
-                'trust_score': recent_duplicate.trust_score,
-                'trust_explanation': recent_duplicate.trust_explanation,
-                'claims': ClaimSerializer(recent_duplicate.claims.all(), many=True).data,
-                'contradiction_count': recent_duplicate.contradiction_count,
-            }
-            return render(request, 'submit.html', {'result': result})
+            # Redirect to detail page instead of showing result
+            return redirect('content_detail', content_id=recent_duplicate.id)
 
         # Create Content
         content = Content.objects.create(
@@ -67,16 +116,38 @@ def submit_page(request):
         process_content_async.delay(content.id)
 
         messages.info(request, 'Content submitted! Processing in background...')
-        return redirect('dashboard')
+        # Redirect to detail page instead of dashboard
+        return redirect('content_detail', content_id=content.id)
 
     return render(request, 'submit.html', {'result': result})
 
 
 def dashboard(request):
-    """Dashboard with enhanced stats."""
-    contents = Content.objects.all().order_by('-created_at')[:20]
+    """Dashboard with search and filter."""
+    contents = Content.objects.all().order_by('-created_at')
 
-    # SourceCredibilityEngine.update_all_sources()  # optional
+    # Search by content text
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        contents = contents.filter(raw_text__icontains=search_query)
+
+    # Filter by trust score range
+    min_score = request.GET.get('min_score', '')
+    max_score = request.GET.get('max_score', '')
+
+    if min_score:
+        try:
+            contents = contents.filter(trust_score__gte=float(min_score))
+        except ValueError:
+            pass
+
+    if max_score:
+        try:
+            contents = contents.filter(trust_score__lte=float(max_score))
+        except ValueError:
+            pass
+
+    contents = contents[:20]  # Latest 20
 
     data = {
         'total_content': Content.objects.count(),
@@ -84,6 +155,9 @@ def dashboard(request):
         'total_claims': Claim.objects.count(),
         'total_contradictions': Contradiction.objects.count(),
         'contents': contents,
+        'search_query': search_query,
+        'min_score': min_score,
+        'max_score': max_score,
     }
     return render(request, 'dashboard.html', data)
 

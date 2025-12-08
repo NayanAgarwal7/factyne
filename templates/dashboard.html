@@ -29,6 +29,35 @@
     </div>
 </div>
 
+
+<div class="card" style="margin-bottom: 30px;">
+    <div class="card__body">
+        <h3>Search & Filter</h3>
+        <form method="GET" style="display: grid; gap: 15px;">
+            <div>
+                <label for="search" class="form-label">Search Content</label>
+                <input type="text" id="search" name="search" class="form-control" 
+                       value="{{ search_query }}" placeholder="Search by keyword...">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <label for="min_score" class="form-label">Min Trust Score</label>
+                    <input type="number" id="min_score" name="min_score" class="form-control" 
+                           value="{{ min_score }}" min="0" max="1" step="0.1" placeholder="0.0">
+                </div>
+                <div>
+                    <label for="max_score" class="form-label">Max Trust Score</label>
+                    <input type="number" id="max_score" name="max_score" class="form-control" 
+                           value="{{ max_score }}" min="0" max="1" step="0.1" placeholder="1.0">
+                </div>
+            </div>
+            <button type="submit" class="btn btn--primary">Search</button>
+            <a href="{% url 'dashboard' %}" class="btn btn--secondary" style="text-align: center; text-decoration: none;">Clear</a>
+        </form>
+    </div>
+</div>
+
+
 <div class="card">
     <h3>Recent Submissions</h3>
     

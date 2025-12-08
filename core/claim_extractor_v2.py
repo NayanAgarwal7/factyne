@@ -33,7 +33,7 @@ class AdvancedClaimExtractor:
     # Negation patterns
     NEGATION_PATTERNS = [
         r'\b(not|no|never|neither|nor)\b',
-        r'\b(doesn\'t|don\'t|didn\'t|won\'t|can\'t|couldn\'t)\b',
+        r"\b(doesn't|don't|didn't|won't|can't|couldn't)\b",
         r'\b(fails to|failed to)\b',
     ]
 
@@ -45,6 +45,25 @@ class AdvancedClaimExtractor:
     ]
 
     @staticmethod
+    def _clean_claim_text(claim_text: str) -> str:
+        """
+        Clean extracted claim text by removing entity tags and fixing truncation.
+        """
+        # Remove entity type annotations like "(MONEY):", "(LOC):", "(ORG)" etc.
+        claim_text = re.sub(r'\s*\([A-Z]+\):\s*', ' ', claim_text)
+        claim_text = re.sub(r'\s*\([A-Z]+\)\s*', ' ', claim_text)
+
+        # Normalize whitespace
+        claim_text = ' '.join(claim_text.split())
+
+        # Truncate overly long claims for readability
+        max_len = 200
+        if len(claim_text) > max_len:
+            claim_text = claim_text[:max_len].rsplit(' ', 1)[0] + '…'
+
+        return claim_text.strip()
+
+    @staticmethod
     def extract_claims(text: str, min_length: int = 10) -> List[Dict[str, Any]]:
         """
         Extract claims from text using multiple strategies.
@@ -54,7 +73,7 @@ class AdvancedClaimExtractor:
             logger.info(f"Text too short ({len(text)} chars)")
             return []
 
-        claims = []
+        claims: List[Dict[str, Any]] = []
 
         # Strategy 1: Sentence-based extraction (always run)
         sentence_claims = AdvancedClaimExtractor._extract_from_sentences(text)
@@ -73,6 +92,10 @@ class AdvancedClaimExtractor:
         # Deduplicate similar claims
         claims = AdvancedClaimExtractor._deduplicate_claims(claims)
 
+        # Final cleanup of claim_text for all claims
+        for c in claims:
+            c['claim_text'] = AdvancedClaimExtractor._clean_claim_text(c['claim_text'])
+
         logger.info(f"Extracted {len(claims)} unique claims from {len(text.split())} words")
         return claims
 
@@ -80,7 +103,7 @@ class AdvancedClaimExtractor:
     def _extract_from_sentences(text: str) -> List[Dict[str, Any]]:
         """Extract claims from declarative sentences."""
         sentences = text.split('.')
-        claims = []
+        claims: List[Dict[str, Any]] = []
 
         for sent in sentences:
             sent = sent.strip()
@@ -147,7 +170,7 @@ class AdvancedClaimExtractor:
             return []
 
         doc = nlp(text)
-        claims = []
+        claims: List[Dict[str, Any]] = []
 
         # Group entities with their context
         for ent in doc.ents:
@@ -155,7 +178,7 @@ class AdvancedClaimExtractor:
             start, end = max(0, ent.start_char - 100), min(
                 len(text), ent.end_char + 100
             )
-            context = text[start : end].strip()
+            context = text[start:end].strip()
 
             # Skip very generic contexts
             if len(context) < 15:
@@ -191,7 +214,7 @@ class AdvancedClaimExtractor:
             return []
 
         doc = nlp(text)
-        claims = []
+        claims: List[Dict[str, Any]] = []
 
         for token in doc:
             # Look for verbs as claim centers
