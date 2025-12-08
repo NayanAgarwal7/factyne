@@ -2,7 +2,27 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.text import slugify  # ok if unused for now
+import secrets
+from django.contrib.auth.models import User
 
+
+class APIKey(models.Model):
+    """API keys for external integrations."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='api_keys')
+    key = models.CharField(max_length=64, unique=True, db_index=True)
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    rate_limit = models.IntegerField(default=100)  # requests per hour
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used = models.DateTimeField(null=True, blank=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = secrets.token_urlsafe(48)
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.name} - {self.key[:10]}..."
 
 class Content(models.Model):
     url = models.URLField(null=True, blank=True)

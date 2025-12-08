@@ -1,5 +1,13 @@
 from django.urls import path
 from . import views
+from core.export import ReportExporter
+from django.http import HttpResponse
+
+def export_pdf_view(request, content_id):
+    return ReportExporter.export_pdf(content_id)
+
+def export_json_view(request, content_id):
+    return ReportExporter.export_json(content_id)
 
 urlpatterns = [
     path('health/', views.health_check, name='health_check'),
@@ -15,4 +23,6 @@ urlpatterns = [
     
     # Contradiction endpoints
     path('contradictions/', views.contradictions_list, name='contradictions_list'),
+    path('content/<int:content_id>/export/pdf/', export_pdf_view, name='export_pdf'),
+    path('content/<int:content_id>/export/json/', export_json_view, name='export_json'),
 ]
