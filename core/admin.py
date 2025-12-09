@@ -1,7 +1,20 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Content, Claim, Contradiction, Source
+from core.models import Content, Claim, APIKey, Evidence, Contradiction, Source
 
+
+@admin.register(APIKey)
+class APIKeyAdmin(admin.ModelAdmin):
+    list_display = ('user', 'key_preview', 'is_active', 'rate_limit', 'calls_this_month', 'created_at')
+    readonly_fields = ('key', 'created_at', 'last_used')
+    fields = ('user', 'name', 'key', 'is_active', 'rate_limit', 'calls_this_month', 'created_at', 'last_used')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('user__username', 'name')
+    
+    def key_preview(self, obj):
+        """Show first 8 and last 4 chars of key"""
+        return f"{obj.key[:8]}****{obj.key[-4:]}"
+    key_preview.short_description = "API Key"
 
 @admin.register(Content)
 class ContentAdmin(admin.ModelAdmin):

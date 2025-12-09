@@ -1,35 +1,36 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.utils.text import slugify  # ok if unused for now
 import secrets
-from django.contrib.auth.models import User
+import uuid
 
 
 class APIKey(models.Model):
-    """API keys for external integrations."""
+    """API keys for external integrations (enterprise API clients)."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='api_keys')
     key = models.CharField(max_length=64, unique=True, db_index=True)
     name = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
-    rate_limit = models.IntegerField(default=100)  # requests per hour
+    rate_limit = models.IntegerField(default=1000)  # requests per month
+    calls_this_month = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     last_used = models.DateTimeField(null=True, blank=True)
-    
+
     def save(self, *args, **kwargs):
         if not self.key:
-            self.key = secrets.token_urlsafe(48)
+            self.key = secrets.token_urlsafe(48)[:64]
         super().save(*args, **kwargs)
-    
+
     def __str__(self):
         return f"{self.name} - {self.key[:10]}..."
+
 
 class Content(models.Model):
     url = models.URLField(null=True, blank=True)
     raw_text = models.TextField()
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     trust_score = models.FloatField(default=0.5)
-    trust_explanation = models.TextField(blank=True, default="")  # NEW
+    trust_explanation = models.TextField(blank=True, default="")
     contradiction_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -49,21 +50,17 @@ class Content(models.Model):
             self.save(update_fields=['trust_score', 'trust_explanation'])
             return
 
-        # Base score from claim confidence
         avg_confidence = sum(c.confidence for c in claims) / claims.count()
 
-        # Penalty for contradictions
-        from django.db import models as djmodels  # local alias to avoid confusion
+        from django.db import models as djmodels
         contradictions = Contradiction.objects.filter(
             djmodels.Q(claim_a__content=self) | djmodels.Q(claim_b__content=self)
         )
 
         contradiction_penalty = contradictions.count() * 0.1
-
         self.trust_score = max(0.0, min(1.0, avg_confidence - contradiction_penalty))
         self.contradiction_count = contradictions.count()
 
-        # Build human-readable explanation
         explanation_parts = [
             f"Based on {claims.count()} extracted claims.",
             f"Average claim confidence: {avg_confidence:.0%}.",
@@ -80,7 +77,6 @@ class Content(models.Model):
             explanation_parts.append("Many claims are qualified or negated, reducing confidence.")
 
         self.trust_explanation = " ".join(explanation_parts)
-
         self.save(update_fields=['trust_score', 'contradiction_count', 'trust_explanation'])
 
 
@@ -91,7 +87,7 @@ class Claim(models.Model):
     is_negated = models.BooleanField(default=False)
     has_qualifier = models.BooleanField(default=False)
     source = models.ForeignKey('Source', on_delete=models.SET_NULL, null=True, blank=True)
-    evidence_summary = models.TextField(blank=True, default="")  # NEW
+    evidence_summary = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -167,8 +163,8 @@ class Contradiction(models.Model):
 class Source(models.Model):
     name = models.CharField(max_length=255, unique=True)
     url = models.URLField(blank=True)
-    reliability_score = models.FloatField(default=0.5)  # 0-1
-    bias_score = models.FloatField(default=0.5)  # 0=left, 0.5=neutral, 1=right
+    reliability_score = models.FloatField(default=0.5)
+    bias_score = models.FloatField(default=0.5)
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):

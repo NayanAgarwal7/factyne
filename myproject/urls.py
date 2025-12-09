@@ -14,19 +14,28 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
-from django.urls import path, include
-from core import views
+from django.urls import path
+from core.api.endpoints import fact_check_api, fact_check_status, api_key_info
+from core.views import submit_page, dashboard, content_detail, content_pdf, api_docs
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('api.urls')),
-    path('', views.dashboard, name='dashboard'),                    # Home page
-    path('submit/', views.submit_page, name='submit_page'),         # Submit UI
-    path('content/<int:content_id>/', views.content_detail, name='content_detail'),  # NEW: Detail page
-    path('content/<int:content_id>/pdf/', views.content_pdf, name='content_pdf'),
-    path('api-docs/', views.api_docs, name='api_docs'),             # API docs
+    
+    # Web UI
+    path('', dashboard, name='dashboard'),
+    path('submit/', submit_page, name='submit_page'),
+    path('content/<int:content_id>/', content_detail, name='content_detail'),
+    path('content/<int:content_id>/pdf/', content_pdf, name='content_pdf'),
+    path('api-docs/', api_docs, name='api_docs'),
+    
+    # REST API v1
+    path('api/v1/fact-check/', fact_check_api, name='fact_check_api'),
+    path('api/v1/status/<int:content_id>/', fact_check_status, name='fact_check_status'),  # Changed from uuid to int
+    path('api/v1/key-info/', api_key_info, name='api_key_info'),
 ]
+
 
 
