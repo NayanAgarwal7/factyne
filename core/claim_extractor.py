@@ -2,6 +2,7 @@ import re
 from typing import List, Dict
 from difflib import SequenceMatcher
 
+
 class ClaimExtractor:
     """
     Advanced claim extraction from text using:
@@ -14,15 +15,19 @@ class ClaimExtractor:
     CLAIM_KEYWORDS = [
         r'\b(is|are|was|were)\s+',
         r'\b(has|have|had)\s+',
-        r'\b(says|claims|states|reports|shows|proves|demonstrates|indicates)\s+',
-        r'\b(\d+%|\d+\s*(percent|billion|million|thousand|years|months))\s+',
-        r'\b(according to|studies show|research indicates|data shows)\s+',
-        r'\b(vaccine|covid|pandemic|disease|virus|treatment|drug|medicine)\s+',
-        r'\b(government|company|organization|agency|institution)\s+',
-        r'\b(temperature|climate|weather|global|warming|emissions)\s+',
-        r'\b(cause|caused|causes|leading to|results in|leads to)\s+',
+        r'\b(says|claims|states|reports|shows|proves|demonstrates|indicates|suggests)\s+',
+        r'\b(\d+%|\d+\s*(percent|billion|million|thousand|years|months|days|hours))\s+',
+        r'\b(according to|studies show|research indicates|data shows|evidence suggests|findings show)\s+',
+        r'\b(vaccine|covid|pandemic|disease|virus|treatment|drug|medicine|therapy|symptom)\s+',
+        r'\b(government|company|organization|agency|institution|university|hospital|media)\s+',
+        r'\b(temperature|climate|weather|global|warming|emissions|carbon|pollution)\s+',
+        r'\b(cause|caused|causes|leading to|results in|leads to|contribute|contributed|contributing)\s+',
+        r'\b(increase|increased|increases|decrease|decreased|decreases|rise|drop|fall)\s+',
+        r'\b(safe|unsafe|dangerous|effective|ineffective|works|fails|successful|failure)\s+',
+        r'\b(risk|risks|benefit|benefits|side.?effect|adverse|harmful|beneficial)\s+',
+        r'\b(new|latest|recent|study|research|report|investigation|analysis|findings)\s+',
     ]
-    
+
     NEGATION_WORDS = ['not', 'no', 'never', 'neither', 'nobody', 'nothing', 'nowhere', 'cannot']
     QUALIFIERS = ['may', 'might', 'could', 'possibly', 'probably', 'allegedly', 'reportedly', 'seems', 'appears']
     
@@ -54,7 +59,7 @@ class ClaimExtractor:
         return False
     
     @staticmethod
-    def extract_claims(text: str, confidence_threshold: float = 0.55) -> List[Dict]:
+    def extract_claims(text: str, confidence_threshold: float = 0.50) -> List[Dict]:
         """Extract claims with confidence scoring."""
         sentences = ClaimExtractor.extract_sentences(text)
         claims = []
@@ -106,7 +111,11 @@ class ClaimExtractor:
     def extract_keywords(claim_text: str) -> List[str]:
         """Extract keywords for similarity matching."""
         words = claim_text.lower().split()
-        stopwords = {'is', 'are', 'was', 'were', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'be', 'been', 'being'}
+        stopwords = {
+            'is', 'are', 'was', 'were', 'the', 'a', 'an', 'and', 'or', 'but',
+            'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from',
+            'be', 'been', 'being'
+        }
         keywords = [w.strip('.,!?;:') for w in words if len(w) > 3 and w not in stopwords]
         return list(set(keywords))[:15]
 
@@ -118,12 +127,12 @@ class ContradictionDetector:
     - Negation analysis
     - Similarity matching
     """
-    
+
     @staticmethod
     def similarity_ratio(text1: str, text2: str) -> float:
         """Calculate text similarity (0.0-1.0)."""
         return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
-    
+
     @staticmethod
     def keyword_overlap(claim1: str, claim2: str) -> float:
         """Calculate overlap in keywords (0.0-1.0)."""
@@ -136,9 +145,23 @@ class ContradictionDetector:
         overlap = len(kw1 & kw2)
         total = len(kw1 | kw2)
         return overlap / total if total > 0 else 0.0
-    
+
     @staticmethod
-    def detect_contradiction(claim1_text: str, claim2_text: str, claim1_negated: bool = False, claim2_negated: bool = False) -> Dict:
+    def _normalize_token(word: str) -> str:
+        """Very simple stemming/normalization for contradiction checks."""
+        word = word.lower().strip('.,!?;:()[]{}"\'')
+        for suffix in ['ing', 'ed', 'es', 's']:
+            if word.endswith(suffix) and len(word) > len(suffix) + 2:
+                return word[:-len(suffix)]
+        return word
+
+    @staticmethod
+    def detect_contradiction(
+        claim1_text: str,
+        claim2_text: str,
+        claim1_negated: bool = False,
+        claim2_negated: bool = False
+    ) -> Dict:
         """
         Detect if two claims contradict. Returns:
         - is_contradiction: bool
@@ -146,28 +169,31 @@ class ContradictionDetector:
         - type: 'direct_negation', 'semantic', 'statistical', 'none'
         - explanation: human-readable description
         """
-        
-        # Direct negation: same claim, opposite negation
+        # Direct negation: same-ish claim, opposite negation
         similarity = ContradictionDetector.similarity_ratio(claim1_text, claim2_text)
         keyword_overlap = ContradictionDetector.keyword_overlap(claim1_text, claim2_text)
-        
+
         # Rule 1: High similarity + opposite negation = direct contradiction
-        if similarity > 0.8 and claim1_negated != claim2_negated:
+        if similarity > 0.5 and claim1_negated != claim2_negated:
             return {
                 'is_contradiction': True,
                 'type': 'direct_negation',
                 'importance_score': round(min(1.0, 0.8 + (keyword_overlap * 0.2)), 2),
                 'explanation': f'Direct contradiction: one claims something, the other denies it (similarity: {round(similarity, 2)})'
             }
-        
+
         # Rule 2: Good keyword overlap + opposite logical direction
-        if keyword_overlap > 0.6:
-            # Check for opposite adjectives/verbs
+        if keyword_overlap > 0.3:
+            # Normalize tokens
             lower1 = claim1_text.lower()
             lower2 = claim2_text.lower()
-            
+            tokens1 = [ContradictionDetector._normalize_token(w) for w in lower1.split()]
+            tokens2 = [ContradictionDetector._normalize_token(w) for w in lower2.split()]
+
             opposites = [
                 ('increase', 'decrease'),
+                ('rise', 'fall'),
+                ('up', 'down'),
                 ('safe', 'dangerous'),
                 ('effective', 'ineffective'),
                 ('true', 'false'),
@@ -175,22 +201,25 @@ class ContradictionDetector:
                 ('support', 'oppose'),
                 ('help', 'harm'),
                 ('benefit', 'harm'),
+                ('flat', 'spherical'),
             ]
-            
+
             for word1, word2 in opposites:
-                if (word1 in lower1 and word2 in lower2) or (word2 in lower1 and word1 in lower2):
+                w1 = ContradictionDetector._normalize_token(word1)
+                w2 = ContradictionDetector._normalize_token(word2)
+                if (w1 in tokens1 and w2 in tokens2) or (w2 in tokens1 and w1 in tokens2):
                     return {
                         'is_contradiction': True,
                         'type': 'semantic',
                         'importance_score': round(0.7 + (keyword_overlap * 0.25), 2),
                         'explanation': f'Semantic contradiction: claims use opposite concepts (keywords: {keyword_overlap:.0%} overlap)'
                     }
-        
+
         # Rule 3: Specific numbers in conflict
         numbers1 = re.findall(r'\d+', claim1_text)
         numbers2 = re.findall(r'\d+', claim2_text)
-        
-        if numbers1 and numbers2 and keyword_overlap > 0.5:
+
+        if numbers1 and numbers2 and keyword_overlap > 0.2:
             try:
                 if numbers1[0] != numbers2[0]:
                     return {
@@ -199,9 +228,9 @@ class ContradictionDetector:
                         'importance_score': round(0.65 + (keyword_overlap * 0.3), 2),
                         'explanation': f'Statistical discrepancy: different numbers reported ({numbers1[0]} vs {numbers2[0]})'
                     }
-            except:
+            except Exception:
                 pass
-        
+
         # No contradiction
         return {
             'is_contradiction': False,
@@ -209,7 +238,7 @@ class ContradictionDetector:
             'importance_score': 0.0,
             'explanation': 'No clear contradiction detected'
         }
-    
+
     @staticmethod
     def detect_contradictions_batch(new_claim_text: str, existing_claims: List[Dict]) -> List[Dict]:
         """
