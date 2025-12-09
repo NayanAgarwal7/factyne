@@ -1,8 +1,8 @@
-venv/
 *.pyc
 __pycache__/
-*.db
 .env
+.env.local
+*.sqlite3
+venv/
 .DS_Store
-*.log
-migrations/                       
+     
